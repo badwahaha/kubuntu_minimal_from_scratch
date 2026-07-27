@@ -126,7 +126,7 @@ EOF
 
 # 6. Extract Kernel Assets For Media Boot Loader
 echo "=== [Step 5/8] Pulling Boot Kernel and Initial Boot Ramdisk Images ==="
-KERNEL_VERSION=\$(ls "${ROOTFS}/boot"/vmlinuz-* 2>/dev/null | head -n 1 | sed 's/.*vmlinuz-//')
+KERNEL_VERSION=$(ls "${ROOTFS}/boot"/vmlinuz-* 2>/dev/null | head -n 1 | sed 's/.*vmlinuz-//')
 
 if [ -z "\${KERNEL_VERSION}" ]; then
     echo "ERROR: No kernel found in \${ROOTFS}/boot"

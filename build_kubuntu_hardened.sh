@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # HARDENED KUBUNTU 26.04 LTS (RESOLUTE) MINIMAL ISO ENGINE FROM SCRATCH
-# Fully compliant with DEB822 repository configurations & folder structures.
+# Optimized for GitHub Actions Cloud Execution with DEB822 Repository Parsing
 # ==============================================================================
 
 set -Eeuo pipefail
@@ -9,18 +9,18 @@ export DEBIAN_FRONTEND=noninteractive
 
 # 1. Pipeline Target Configurations
 CODENAME="resolute"
-MIRROR="http://archive.ubuntu.com/ubuntu"
+MIRROR="http://ubuntu.com"
 
 BUILD_DIR="/tmp/kubuntu-hardened-build"
 ROOTFS="${BUILD_DIR}/chroot"
 IMAGE_DIR="${BUILD_DIR}/iso_structure"
 ISO_OUT="${GITHUB_WORKSPACE:-/tmp}/kubuntu-26.04-minimal-hardened.iso"
 
-# 2. Advanced Signal Trap Cleanup Handler (With Lazy Umount fallback)
+# 2. Advanced Signal Trap Cleanup Handler (Aligned with exact mounts)
 cleanup() {
     echo "🚨 Signal caught or process ended. Commencing filesystem safety cleanup..."
     set +e
-    for mnt in pts dev proc sys run; do
+    for mnt in pts dev proc sys; do
         if mountpoint -q "${ROOTFS}/${mnt}"; then
             sudo umount "${ROOTFS}/${mnt}" || sudo umount -l "${ROOTFS}/${mnt}"
         fi
@@ -54,19 +54,40 @@ echo "=== [Step 4/8] Building Target Workspace Core via Layered Environment ==="
 cat << EOF | sudo chroot "${ROOTFS}" /bin/bash
 set -Eeuo pipefail
 export DEBIAN_FRONTEND=noninteractive
+export MIRROR="${MIRROR}"
+export CODENAME="${CODENAME}"
 
-# CORRECTED: Pivot entirely from legacy sources.list to modern DEB822 ubuntu.sources layout
 echo "Migrating repository mappings to DEB822 layout structure..."
 if [ -f /etc/apt/sources.list ]; then
     mv /etc/apt/sources.list /etc/apt/sources.list.bak
 fi
 
 mkdir -p /etc/apt/sources.list.d
-cat << 'SOURCES' > /etc/apt/sources.list.d/ubuntu.sources
+
+# Unquoted SOURCES and unescaped inner variables allow real-time evaluation
+cat << SOURCES > /etc/apt/sources.list.d/ubuntu.sources
 Types: deb
-URIs: ${MIRROR}
-Suites: ${CODENAME} ${CODENAME}-updates ${CODENAME}-security
-Components: main universe restricted multiverse
+URIs: \${MIRROR}
+Suites: \${CODENAME}
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: \${MIRROR}
+Suites: \${CODENAME}-updates
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: \${MIRROR}
+Suites: \${CODENAME}-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: \${MIRROR}
+Suites: \${CODENAME}-backports
+Components: main restricted universe multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 SOURCES
 
@@ -108,10 +129,15 @@ EOF
 
 # 6. Extract Kernel Assets For Media Boot Loader
 echo "=== [Step 5/8] Pulling Boot Kernel and Initial Boot Ramdisk Images ==="
-# CORRECTED: Syntactical substitution evaluating accurately on host context
-KERNEL_VERSION=$(ls "${ROOTFS}/boot"/vmlinuz-* | head -n 1 | sed 's/.*vmlinuz-//')
-sudo cp "${ROOTFS}/boot/vmlinuz-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
-sudo cp "${ROOTFS}/boot/initrd.img-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd"
+KERNEL_VERSION=\$(ls "${ROOTFS}/boot"/vmlinuz-* 2>/dev/null | head -n 1 | sed 's/.*vmlinuz-//')
+
+if [ -z "\${KERNEL_VERSION}" ]; then
+    echo "ERROR: No kernel found in \${ROOTFS}/boot"
+    exit 1
+fi
+
+sudo cp "${ROOTFS}/boot/vmlinuz-\${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
+sudo cp "${ROOTFS}/boot/initrd.img-\${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd"
 
 # 7. Compress Live Workspace File Container
 echo "=== [Step 6/8] Recompressing Sandbox System into Squashfs Container ==="
@@ -122,8 +148,7 @@ sudo umount "${ROOTFS}/sys"     || true
 
 sudo mksquashfs "${ROOTFS}" "${IMAGE_DIR}/casper/filesystem.squashfs" -comp xz -b 1M -noappend
 
-# CORRECTED: Using direct host pipeline mapping instead of nested subshell strings
-printf "%s" "$(du -sx --block-size=1 "${ROOTFS}" | cut -f1)" | sudo tee "${IMAGE_DIR}/casper/filesystem.size" > /dev/null
+printf "%s" "\$(du -sx --block-size=1 "${ROOTFS}" | cut -f1)" | sudo tee "${IMAGE_DIR}/casper/filesystem.size" > /dev/null
 
 # 8. Dual-Boot Layout Configuration Matrix
 echo "=== [Step 7/8] Deploying Unified Hybrid Bootloader Rules ==="
@@ -151,7 +176,6 @@ EOF
 
 # 9. Master Production ISO Output Image via xorriso
 echo "=== [Step 8/8] Mastering Bootable Hybrid Image via Xorriso ==="
-# CORRECTED: Explicit path initialization prevents target destination crashes
 mkdir -p "${IMAGE_DIR}/boot/grub/i386-pc"
 
 sudo grub-mkimage -o "${IMAGE_DIR}/boot/grub/i386-pc/core.img" -O i386-pc -p /boot/grub biosdisk ext2 fat iso9660 search

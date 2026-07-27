@@ -8,7 +8,7 @@ export DEBIAN_FRONTEND=noninteractive
 
 # 1. Pipeline Target Configurations
 CODENAME="resolute"
-MIRROR="http://ubuntu.com"
+MIRROR="http://archive.ubuntu.com/ubuntu"
 
 BUILD_DIR="/tmp/kubuntu-hardened-build"
 ROOTFS="${BUILD_DIR}/chroot"

@@ -103,8 +103,7 @@ apt-get install -y -qq --no-install-recommends \
 
 # C. MANDATORY: Calamares OS Installer & Desktop Settings
 apt-get install -y -qq --no-install-recommends \
-    calamares calamares-settings-ubuntu calamares-settings-kubuntu \
-    polkit-kdewallet-backend kubuntu-settings-desktop
+    calamares calamares-settings-kubuntu kubuntu-settings-desktop
 
 # D. Desktop Shell & Requested Core Apps (Konsole, Dolphin, Kate)
 apt-get install -y -qq --no-install-recommends \

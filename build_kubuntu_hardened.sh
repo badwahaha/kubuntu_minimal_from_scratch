@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # HARDENED KUBUNTU 26.04 LTS (RESOLUTE) MINIMAL ISO ENGINE FROM SCRATCH
-# Optimized for GitHub Actions Cloud Execution environment compatibility.
+# Fully compliant with DEB822 repository configurations & folder structures.
 # ==============================================================================
 
 set -Eeuo pipefail
@@ -9,18 +9,17 @@ export DEBIAN_FRONTEND=noninteractive
 
 # 1. Pipeline Target Configurations
 CODENAME="resolute"
-MIRROR="http://ubuntu.com"
+MIRROR="http://archive.ubuntu.com/ubuntu"
 
 BUILD_DIR="/tmp/kubuntu-hardened-build"
 ROOTFS="${BUILD_DIR}/chroot"
 IMAGE_DIR="${BUILD_DIR}/iso_structure"
 ISO_OUT="${GITHUB_WORKSPACE:-/tmp}/kubuntu-26.04-minimal-hardened.iso"
 
-# 2. Advanced Signal Trap Cleanup Handler (Enhanced with Lazy Umount fallback)
+# 2. Advanced Signal Trap Cleanup Handler (With Lazy Umount fallback)
 cleanup() {
     echo "🚨 Signal caught or process ended. Commencing filesystem safety cleanup..."
     set +e
-    # Safely break all active virtual filesystems
     for mnt in pts dev proc sys run; do
         if mountpoint -q "${ROOTFS}/${mnt}"; then
             sudo umount "${ROOTFS}/${mnt}" || sudo umount -l "${ROOTFS}/${mnt}"
@@ -37,10 +36,10 @@ mkdir -p "${ROOTFS}" "${IMAGE_DIR}/casper" "${IMAGE_DIR}/boot/grub"
 sudo apt-get update -qq
 sudo apt-get install -y -qq debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync zstd
 
-# 3. Bootstrap OS Engine Tree
+# 3. Bootstrap OS Engine Tree with Release Fallback Script Definition
 echo "=== [Step 2/8] Instantiating Clean Resolute Raccoon Operating System Tree ==="
 sudo debootstrap --variant=minbase --components=main,universe,restricted,multiverse \
-    "${CODENAME}" "${ROOTFS}" "${MIRROR}"
+    "${CODENAME}" "${ROOTFS}" "${MIRROR}" /usr/share/debootstrap/scripts/noble
 
 # 4. Virtual Mount Binding Execution
 echo "=== [Step 3/8] Bridging Virtual Host Kernel Filesystem Tables ==="
@@ -56,11 +55,19 @@ cat << EOF | sudo chroot "${ROOTFS}" /bin/bash
 set -Eeuo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
-# Enforce upstream production archive configurations
-cat << 'SOURCES' > /etc/apt/sources.list
-deb ${MIRROR} ${CODENAME} main universe restricted multiverse
-deb ${MIRROR} ${CODENAME}-updates main universe restricted multiverse
-deb ${MIRROR} ${CODENAME}-security main universe restricted multiverse
+# CORRECTED: Pivot entirely from legacy sources.list to modern DEB822 ubuntu.sources layout
+echo "Migrating repository mappings to DEB822 layout structure..."
+if [ -f /etc/apt/sources.list ]; then
+    mv /etc/apt/sources.list /etc/apt/sources.list.bak
+fi
+
+mkdir -p /etc/apt/sources.list.d
+cat << 'SOURCES' > /etc/apt/sources.list.d/ubuntu.sources
+Types: deb
+URIs: ${MIRROR}
+Suites: ${CODENAME} ${CODENAME}-updates ${CODENAME}-security
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 SOURCES
 
 apt-get update -qq
@@ -70,7 +77,7 @@ apt-get upgrade -y -qq
 apt-get install -y -qq --no-install-recommends \
     linux-generic systemd-sysv initramfs-tools linux-firmware zstd
 
-# B. Live Boot Orchestration Engines (Casper Infrastructure without lupin-casper)
+# B. Live Boot Orchestration Engines (Casper Infrastructure)
 apt-get install -y -qq --no-install-recommends \
     casper network-manager netplan.io sudo user-setup
 
@@ -101,21 +108,22 @@ EOF
 
 # 6. Extract Kernel Assets For Media Boot Loader
 echo "=== [Step 5/8] Pulling Boot Kernel and Initial Boot Ramdisk Images ==="
-KERNEL_VERSION=\$(ls "${ROOTFS}/boot"/vmlinuz-* | head -n 1 | sed 's/.*vmlinuz-//')
-sudo cp "${ROOTFS}/boot/vmlinuz-\${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
-sudo cp "${ROOTFS}/boot/initrd.img-\${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd"
+# CORRECTED: Syntactical substitution evaluating accurately on host context
+KERNEL_VERSION=$(ls "${ROOTFS}/boot"/vmlinuz-* | head -n 1 | sed 's/.*vmlinuz-//')
+sudo cp "${ROOTFS}/boot/vmlinuz-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
+sudo cp "${ROOTFS}/boot/initrd.img-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd"
 
 # 7. Compress Live Workspace File Container
 echo "=== [Step 6/8] Recompressing Sandbox System into Squashfs Container ==="
-# Explicit unmounting before block packaging
 sudo umount "${ROOTFS}/dev/pts" || true
 sudo umount "${ROOTFS}/dev"     || true
 sudo umount "${ROOTFS}/proc"    || true
 sudo umount "${ROOTFS}/sys"     || true
 
-# Use maximum XZ block compression logic for low storage footprint
 sudo mksquashfs "${ROOTFS}" "${IMAGE_DIR}/casper/filesystem.squashfs" -comp xz -b 1M -noappend
-sudo bash -c "printf \$(du -sx --block-size=1 ${ROOTFS} | cut -f1) > ${IMAGE_DIR}/casper/filesystem.size"
+
+# CORRECTED: Using direct host pipeline mapping instead of nested subshell strings
+printf "%s" "$(du -sx --block-size=1 "${ROOTFS}" | cut -f1)" | sudo tee "${IMAGE_DIR}/casper/filesystem.size" > /dev/null
 
 # 8. Dual-Boot Layout Configuration Matrix
 echo "=== [Step 7/8] Deploying Unified Hybrid Bootloader Rules ==="
@@ -143,6 +151,9 @@ EOF
 
 # 9. Master Production ISO Output Image via xorriso
 echo "=== [Step 8/8] Mastering Bootable Hybrid Image via Xorriso ==="
+# CORRECTED: Explicit path initialization prevents target destination crashes
+mkdir -p "${IMAGE_DIR}/boot/grub/i386-pc"
+
 sudo grub-mkimage -o "${IMAGE_DIR}/boot/grub/i386-pc/core.img" -O i386-pc -p /boot/grub biosdisk ext2 fat iso9660 search
 cat /usr/lib/grub/i386-pc/cdboot.img "${IMAGE_DIR}/boot/grub/i386-pc/core.img" > "${IMAGE_DIR}/boot/grub/i386-pc/eltorito.img"
 

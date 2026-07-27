@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # HARDENED KUBUNTU 26.04 LTS (RESOLUTE) MINIMAL ISO ENGINE FROM SCRATCH
+# Fully Corrected Dynamic String Expansion for Cloud Build Actions Platforms
 # ==============================================================================
 
 set -Eeuo pipefail
@@ -15,13 +16,13 @@ ROOTFS="${BUILD_DIR}/chroot"
 IMAGE_DIR="${BUILD_DIR}/iso_structure"
 ISO_OUT="${GITHUB_WORKSPACE:-/tmp}/kubuntu-26.04-minimal-hardened.iso"
 
-# 2. Advanced Signal Trap Cleanup Handler
+# 2. Advanced Signal Trap Cleanup Handler (Aligned with exact mounts)
 cleanup() {
     echo "🚨 Signal caught or process ended. Commencing filesystem safety cleanup..."
     set +e
     for mnt in pts dev proc sys; do
         if mountpoint -q "${ROOTFS}/${mnt}"; then
-            sudo umount "${ROOTFS}/${mnt}" || sudo umount -l "${ROOTFS}/${mnt}"
+            sudo umount -l "${ROOTFS}/${mnt}" || sudo umount "${ROOTFS}/${mnt}"
         fi
     done
     echo "🧹 Cleanup sequence finished."
@@ -63,7 +64,7 @@ fi
 
 mkdir -p /etc/apt/sources.list.d
 
-# CORRECTED: SOURCES is unquoted to allow variable expansion inside the chroot
+# SOURCES is unquoted to allow variable expansion inside the chroot context
 cat << SOURCES > /etc/apt/sources.list.d/ubuntu.sources
 Types: deb
 URIs: \$MIRROR
@@ -101,7 +102,7 @@ apt-get install -y -qq --no-install-recommends \
 apt-get install -y -qq --no-install-recommends \
     casper network-manager netplan.io sudo user-setup
 
-# C. MANDATORY: Calamares OS Installer & Desktop Settings
+# C. Calamares Installer & Kubuntu Configurations
 apt-get install -y -qq --no-install-recommends \
     calamares calamares-settings-kubuntu kubuntu-settings-desktop
 
@@ -126,15 +127,16 @@ EOF
 
 # 6. Extract Kernel Assets For Media Boot Loader
 echo "=== [Step 5/8] Pulling Boot Kernel and Initial Boot Ramdisk Images ==="
+# FIXED: Pure unescaped Bash evaluation mapping onto host environment
 KERNEL_VERSION=$(ls "${ROOTFS}/boot"/vmlinuz-* 2>/dev/null | head -n 1 | sed 's/.*vmlinuz-//')
 
-if [ -z "\${KERNEL_VERSION}" ]; then
-    echo "ERROR: No kernel found in \${ROOTFS}/boot"
+if [ -z "${KERNEL_VERSION}" ]; then
+    echo "ERROR: No kernel found in ${ROOTFS}/boot"
     exit 1
 fi
 
-sudo cp "${ROOTFS}/boot/vmlinuz-\${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
-sudo cp "${ROOTFS}/boot/initrd.img-\${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd"
+sudo cp "${ROOTFS}/boot/vmlinuz-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
+sudo cp "${ROOTFS}/boot/initrd.img-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd"
 
 # 7. Compress Live Workspace File Container
 echo "=== [Step 6/8] Recompressing Sandbox System into Squashfs Container ==="
@@ -145,7 +147,8 @@ sudo umount "${ROOTFS}/sys"     || true
 
 sudo mksquashfs "${ROOTFS}" "${IMAGE_DIR}/casper/filesystem.squashfs" -comp xz -b 1M -noappend
 
-printf "%s" "\$(du -sx --block-size=1 "${ROOTFS}" | cut -f1)" | sudo tee "${IMAGE_DIR}/casper/filesystem.size" > /dev/null
+# FIXED: Unescaped string generation to accurately map block dimensions onto host shell
+printf "%s" "$(du -sx --block-size=1 "${ROOTFS}" | cut -f1)" | sudo tee "${IMAGE_DIR}/casper/filesystem.size" > /dev/null
 
 # 8. Dual-Boot Layout Configuration Matrix
 echo "=== [Step 7/8] Deploying Unified Hybrid Bootloader Rules ==="

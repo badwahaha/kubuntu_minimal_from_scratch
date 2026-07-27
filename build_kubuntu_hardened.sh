@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # HARDENED KUBUNTU 26.04 LTS (RESOLUTE) MINIMAL ISO ENGINE FROM SCRATCH
-# Optimized for GitHub Actions Cloud Execution with DEB822 Repository Parsing
 # ==============================================================================
 
 set -Eeuo pipefail
@@ -16,7 +15,7 @@ ROOTFS="${BUILD_DIR}/chroot"
 IMAGE_DIR="${BUILD_DIR}/iso_structure"
 ISO_OUT="${GITHUB_WORKSPACE:-/tmp}/kubuntu-26.04-minimal-hardened.iso"
 
-# 2. Advanced Signal Trap Cleanup Handler (Aligned with exact mounts)
+# 2. Advanced Signal Trap Cleanup Handler
 cleanup() {
     echo "🚨 Signal caught or process ended. Commencing filesystem safety cleanup..."
     set +e
@@ -36,7 +35,7 @@ mkdir -p "${ROOTFS}" "${IMAGE_DIR}/casper" "${IMAGE_DIR}/boot/grub"
 sudo apt-get update -qq
 sudo apt-get install -y -qq debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync zstd
 
-# 3. Bootstrap OS Engine Tree with Release Fallback Script Definition
+# 3. Bootstrap OS Engine Tree
 echo "=== [Step 2/8] Instantiating Clean Resolute Raccoon Operating System Tree ==="
 sudo debootstrap --variant=minbase --components=main,universe,restricted,multiverse \
     "${CODENAME}" "${ROOTFS}" "${MIRROR}" /usr/share/debootstrap/scripts/noble
@@ -64,29 +63,29 @@ fi
 
 mkdir -p /etc/apt/sources.list.d
 
-# Unquoted SOURCES and unescaped inner variables allow real-time evaluation
+# CORRECTED: SOURCES is unquoted to allow variable expansion inside the chroot
 cat << SOURCES > /etc/apt/sources.list.d/ubuntu.sources
 Types: deb
-URIs: \${MIRROR}
-Suites: \${CODENAME}
+URIs: \$MIRROR
+Suites: \$CODENAME
 Components: main restricted universe multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
-URIs: \${MIRROR}
-Suites: \${CODENAME}-updates
+URIs: \$MIRROR
+Suites: \$CODENAME-updates
 Components: main restricted universe multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
-URIs: \${MIRROR}
-Suites: \${CODENAME}-security
+URIs: \$MIRROR
+Suites: \$CODENAME-security
 Components: main restricted universe multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
-URIs: \${MIRROR}
-Suites: \${CODENAME}-backports
+URIs: \$MIRROR
+Suites: \$CODENAME-backports
 Components: main restricted universe multiverse
 Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 SOURCES
@@ -102,22 +101,21 @@ apt-get install -y -qq --no-install-recommends \
 apt-get install -y -qq --no-install-recommends \
     casper network-manager netplan.io sudo user-setup
 
-# C. Calamares OS Installer & Shared Target Configuration Schemes
+# C. MANDATORY: Calamares OS Installer & Desktop Settings
 apt-get install -y -qq --no-install-recommends \
     calamares calamares-settings-ubuntu calamares-settings-kubuntu \
     polkit-kdewallet-backend kubuntu-settings-desktop
 
-# D. Desktop Shell & Target App Contexts (Konsole, Dolphin, Kate)
+# D. Desktop Shell & Requested Core Apps (Konsole, Dolphin, Kate)
 apt-get install -y -qq --no-install-recommends \
     kde-plasma-desktop plasma-workspace konsole dolphin kate \
     kio-extras systemsettings xinit xserver-xorg-core xserver-xorg-video-all
 
-# Configure Default Hardware Session & Desktop User Controls
+# Configure Default Session & Desktop User Controls
 echo "kubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubuntu
 chmod 0440 /etc/sudoers.d/kubuntu
 
-# E. Hardened Purging & Space-Saving Optimizations
-echo "Purging system documentation caches..."
+# E. Space-Saving Optimizations
 find /usr/share/doc -depth -type f ! -name copyright -delete || true
 find /usr/share/man -type f -delete || true
 rm -rf /usr/share/groff/* /usr/share/info/* /var/cache/man/*

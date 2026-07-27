@@ -176,11 +176,20 @@ EOF
 
 # 9. Master Production ISO Output Image via xorriso
 echo "=== [Step 8/8] Mastering Bootable Hybrid Image via Xorriso ==="
+
+# 1. FIXED: Pre-generate the target directory structure
 mkdir -p "${IMAGE_DIR}/boot/grub/i386-pc"
 
+# 2. FIXED: Mirror the host system's GRUB runtime modules into the ISO layout directory
+echo "Syncing GRUB i386-pc modular runtime objects..."
+cp /usr/lib/grub/i386-pc/*.mod "${IMAGE_DIR}/boot/grub/i386-pc/"
+cp /usr/lib/grub/i386-pc/*.lst "${IMAGE_DIR}/boot/grub/i386-pc/"
+
+# 3. Compile the base core bootloader layer image
 sudo grub-mkimage -o "${IMAGE_DIR}/boot/grub/i386-pc/core.img" -O i386-pc -p /boot/grub biosdisk ext2 fat iso9660 search
 cat /usr/lib/grub/i386-pc/cdboot.img "${IMAGE_DIR}/boot/grub/i386-pc/core.img" > "${IMAGE_DIR}/boot/grub/i386-pc/eltorito.img"
 
+# 4. Finalize filesystem composition
 cd "${IMAGE_DIR}"
 sudo xorriso -as mkisofs \
     -r -V "KUBUNTU_2604_HARDENED" \

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # HARDENED KUBUNTU 26.04 LTS (RESOLUTE) MINIMAL ISO ENGINE FROM SCRATCH
-# Inspired by mvallim/live-custom-ubuntu-from-scratch & Fred-Barclay/debroot blueprints
+# Optimized for GitHub Actions Cloud Execution environment compatibility.
 # ==============================================================================
 
 set -Eeuo pipefail
@@ -9,21 +9,21 @@ export DEBIAN_FRONTEND=noninteractive
 
 # 1. Pipeline Target Configurations
 CODENAME="resolute"
-MIRROR="http://archive.ubuntu.com/ubuntu"
+MIRROR="http://ubuntu.com"
 
 BUILD_DIR="/tmp/kubuntu-hardened-build"
 ROOTFS="${BUILD_DIR}/chroot"
 IMAGE_DIR="${BUILD_DIR}/iso_structure"
 ISO_OUT="${GITHUB_WORKSPACE:-/tmp}/kubuntu-26.04-minimal-hardened.iso"
 
-# 2. Advanced Signal Trap Cleanup Handler
+# 2. Advanced Signal Trap Cleanup Handler (Enhanced with Lazy Umount fallback)
 cleanup() {
     echo "🚨 Signal caught or process ended. Commencing filesystem safety cleanup..."
     set +e
     # Safely break all active virtual filesystems
     for mnt in pts dev proc sys run; do
         if mountpoint -q "${ROOTFS}/${mnt}"; then
-            sudo umount -f "${ROOTFS}/${mnt}"
+            sudo umount "${ROOTFS}/${mnt}" || sudo umount -l "${ROOTFS}/${mnt}"
         fi
     done
     echo "🧹 Cleanup sequence finished."
@@ -35,11 +35,10 @@ sudo rm -rf "${BUILD_DIR}"
 mkdir -p "${ROOTFS}" "${IMAGE_DIR}/casper" "${IMAGE_DIR}/boot/grub"
 
 sudo apt-get update -qq
-sudo apt-get install -y -qq debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync
+sudo apt-get install -y -qq debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync zstd
 
 # 3. Bootstrap OS Engine Tree
 echo "=== [Step 2/8] Instantiating Clean Resolute Raccoon Operating System Tree ==="
-# Using '--variant=minbase' to strip away default metapackages
 sudo debootstrap --variant=minbase --components=main,universe,restricted,multiverse \
     "${CODENAME}" "${ROOTFS}" "${MIRROR}"
 
@@ -67,13 +66,13 @@ SOURCES
 apt-get update -qq
 apt-get upgrade -y -qq
 
-# A. Base System Kernel & Microcode Hardware Layer
+# A. Base System Kernel, Compression & Microcode Hardware Layer
 apt-get install -y -qq --no-install-recommends \
-    linux-generic systemd-sysv initramfs-tools linux-firmware
+    linux-generic systemd-sysv initramfs-tools linux-firmware zstd
 
-# B. Live Boot Orchestration Engines (Casper Infrastructure)
+# B. Live Boot Orchestration Engines (Casper Infrastructure without lupin-casper)
 apt-get install -y -qq --no-install-recommends \
-    casper lupin-casper network-manager netplan.io sudo user-setup
+    casper network-manager netplan.io sudo user-setup
 
 # C. Calamares OS Installer & Shared Target Configuration Schemes
 apt-get install -y -qq --no-install-recommends \
@@ -89,7 +88,7 @@ apt-get install -y -qq --no-install-recommends \
 echo "kubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubuntu
 chmod 0440 /etc/sudoers.d/kubuntu
 
-# E. Hardened Purging & Space-Saving Optimizations (Inspired by debootstrap-iso)
+# E. Hardened Purging & Space-Saving Optimizations
 echo "Purging system documentation caches..."
 find /usr/share/doc -depth -type f ! -name copyright -delete || true
 find /usr/share/man -type f -delete || true
@@ -102,9 +101,9 @@ EOF
 
 # 6. Extract Kernel Assets For Media Boot Loader
 echo "=== [Step 5/8] Pulling Boot Kernel and Initial Boot Ramdisk Images ==="
-KERNEL_VERSION=$(ls "${ROOTFS}/boot"/vmlinuz-* | head -n 1 | sed 's/.*vmlinuz-//')
-sudo cp "${ROOTFS}/boot/vmlinuz-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
-sudo cp "${ROOTFS}/boot/initrd.img-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd"
+KERNEL_VERSION=\$(ls "${ROOTFS}/boot"/vmlinuz-* | head -n 1 | sed 's/.*vmlinuz-//')
+sudo cp "${ROOTFS}/boot/vmlinuz-\${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
+sudo cp "${ROOTFS}/boot/initrd.img-\${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd"
 
 # 7. Compress Live Workspace File Container
 echo "=== [Step 6/8] Recompressing Sandbox System into Squashfs Container ==="

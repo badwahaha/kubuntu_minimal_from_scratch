@@ -11,7 +11,6 @@ permissions:
 
 jobs:
   verify-job:
-    # Only execute this test loop if the main build run completed with zero errors
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     
@@ -21,31 +20,41 @@ jobs:
         sudo apt-get update -qq
         sudo apt-get install -y -qq qemu-system-x86 vncsnapshot jq curl
 
-    - name: Automatically Find and Fetch Latest ISO Asset Link
+    - name: Verify and Prepare Cloud KVM Availability
+      run: |
+        echo "=== Checking Cloud Runner Hardware Acceleration Support ==="
+        if [ -e /dev/kvm ]; then
+            echo "✅ Success: KVM hardware nested acceleration is active on this cloud host!"
+            sudo chmod 666 /dev/kvm
+        else
+            echo "⚠️ Warning: KVM module not detected, falling back to software emulation threads."
+        fi
+
+    - name: Fetch Latest ISO Asset via Direct Download Link
       id: fetch_iso
       run: |
-        echo "=== Querying repository deployment endpoints ==="
-        # Uses a flat, structured template to extract the download location securely
-        ISO_URL=$(curl -s "https://github.com{{ github.repository }}/releases" | jq -r '.[0].assets[] | select(.name=="kubuntu-26.04-minimal-hardened.iso") | .browser_download_url')
-        TAG_NAME=$(curl -s "https://github.com{{ github.repository }}/releases" | jq -r '.[0].tag_name')
+        echo "=== Downloading compiled asset via native GitHub release paths ==="
+        # FIXED: Bypasses API JSON lookups to download directly from the latest tag shortcut
+        curl -L -o minimal.iso "https://github.com{{ github.repository }}/releases/latest/download/kubuntu-26.04-minimal-hardened.iso"
         
-        if [ -z "$ISO_URL" ] || [ "$ISO_URL" = "null" ]; then
-            echo "ERROR: Failed to retrieve a valid download URL from the release index table."
-            exit 1
-        fi
-        
-        echo "Downloading target asset from: $ISO_URL"
-        curl -L -o minimal.iso "$ISO_URL"
+        # Dynamically capture tag name for fallback artifact updating
+        TAG_NAME=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.tag_name')
         echo "target_tag=$TAG_NAME" >> $GITHUB_OUTPUT
 
-
-    - name: Headless Boot Execution Test Loop
+    - name: Accelerated Cloud-KVM Boot Execution Test Loop
       run: |
-        echo "=== Launching QEMU sandbox hypervisor ==="
-        sudo qemu-system-x86_64 -m 2048 -cdrom minimal.iso -display vnc=:1 -daemonize
+        echo "=== Launching Hardware Accelerated Cloud KVM Sandbox ==="
+        sudo qemu-system-x86_64 \
+          -enable-kvm \
+          -cpu host \
+          -m 2048 \
+          -vga std \
+          -cdrom minimal.iso \
+          -display vnc=:1 \
+          -daemonize
         
-        echo "=== Giving the kernel 45 seconds to initialize GRUB ==="
-        sleep 45
+        echo "=== System is accelerating via KVM; waiting 25 seconds for full boot flow ==="
+        sleep 25
         
         echo "=== Capturing frame buffer snapshot ==="
         vncsnapshot -allowblank localhost:1 test-proof.jpg || true

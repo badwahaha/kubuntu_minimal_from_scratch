@@ -14,7 +14,7 @@ MIRROR="http://archive.ubuntu.com/ubuntu"
 BUILD_DIR="/tmp/kubuntu-hardened-build"
 ROOTFS="${BUILD_DIR}/chroot"
 IMAGE_DIR="${BUILD_DIR}/iso_structure"
-ISO_OUT="/tmp/kubuntu-26.04-minimal-hardened.iso"
+ISO_OUT="${GITHUB_WORKSPACE:-/tmp}/kubuntu-26.04-minimal-hardened.iso"
 
 # 2. Advanced Signal Trap Cleanup Handler
 cleanup() {

@@ -1,0 +1,45 @@
+name: Build Kubuntu 26.04 Minimal ISO
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows you to manually trigger the build from the GitHub UI
+
+jobs:
+  build-iso:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout Code Repository
+      uses: actions/checkout@v4
+
+    - name: Free Disk Space on Cloud Runner
+      run: |
+        echo "=== Cleaning unneeded runner software to maximize build space ==="
+        sudo rm -rf /usr/share/dotnet
+        sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/ghc
+        sudo rm -rf "/usr/local/share/boost"
+        df -h
+
+    - name: Install System Compilation Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync
+
+    - name: Set Script Permissions
+      run: chmod +x build_kubuntu_hardened.sh
+
+    - name: Run Build Script with Root Privileges
+      run: |
+        # Export the GitHub workspace path explicitly into the root environment context
+        export GITHUB_WORKSPACE="${{ github.workspace }}"
+        sudo -E ./build_kubuntu_hardened.sh
+
+    - name: Upload Completed ISO to GitHub Release Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: kubuntu-26.04-minimal-iso
+        path: ${{ github.workspace }}/kubuntu-26.04-minimal-hardened.iso
+        if-no-files-found: error
+        retention-days: 7

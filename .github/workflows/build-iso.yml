@@ -3,7 +3,10 @@ name: Build Kubuntu 26.04 Minimal ISO
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # Allows you to manually trigger the build from the GitHub UI
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
+
+permissions:
+  contents: write
 
 jobs:
   build-iso:
@@ -25,21 +28,38 @@ jobs:
     - name: Install System Compilation Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync
+        sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync zstd
 
     - name: Set Script Permissions
       run: chmod +x build_kubuntu_hardened.sh
 
     - name: Run Build Script with Root Privileges
       run: |
-        # Export the GitHub workspace path explicitly into the root environment context
         export GITHUB_WORKSPACE="${{ github.workspace }}"
         sudo -E ./build_kubuntu_hardened.sh
 
-    - name: Upload Completed ISO to GitHub Release Artifacts
-      uses: actions/upload-artifact@v4
+    - name: Generate Dynamic Version Tag
+      id: tag
+      run: |
+        echo "release_tag=v$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+
+    - name: Publish Finished ISO to GitHub Release Page
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # FIXED: Explicitly bind the auth token
       with:
-        name: kubuntu-26.04-minimal-iso
-        path: ${{ github.workspace }}/kubuntu-26.04-minimal-hardened.iso
-        if-no-files-found: error
-        retention-days: 7
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        name: "Kubuntu 26.04 Minimal Custom Build (${{ steps.tag.outputs.release_tag }})"
+        body: |
+          Automated compilation of Kubuntu 26.04 Minimal (`resolute`).
+          
+          **Included User Tools:**
+          * Konsole
+          * Dolphin
+          * Kate
+          
+          *Built purely from scratch via debootstrap in the cloud.*
+        draft: false
+        prerelease: false
+        files: |
+          ${{ github.workspace }}/kubuntu-26.04-minimal-hardened.iso

@@ -1,0 +1,55 @@
+name: B - Verify and Test ISO
+
+on:
+  workflow_run:
+    workflows: ["A - Build Kubuntu 26.04 ISO"]
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  verify-job:
+    # Only execute this test loop if the main build run completed with zero errors
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Install Virtualization and Testing Utilities
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq qemu-system-x86 vncsnapshot jq curl
+
+    - name: Automatically Find and Fetch Latest ISO Asset Link
+      id: fetch_iso
+      run: |
+        # Queries the GitHub API to dynamically capture the download URL of your latest uploaded ISO
+        ISO_URL=$(curl -s "https://github.com{{ github.repository }}/releases/latest" \
+
+          | jq -r '.assets[] | select(.name=="kubuntu-26.04-minimal-hardened.iso") | .browser_download_url')
+        
+        TAG_NAME=$(curl -s "https://github.com{{ github.repository }}/releases/latest" | jq -r '.tag_name')
+        
+        echo "Downloading target asset from: $ISO_URL"
+        curl -L -o minimal.iso "$ISO_URL"
+        echo "target_tag=$TAG_NAME" >> $GITHUB_OUTPUT
+
+    - name: Headless Boot Execution Test Loop
+      run: |
+        echo "=== Launching QEMU sandbox hypervisor ==="
+        sudo qemu-system-x86_64 -m 2048 -cdrom minimal.iso -display vnc=:1 -daemonize
+        
+        echo "=== Giving the kernel 45 seconds to initialize GRUB ==="
+        sleep 45
+        
+        echo "=== Capturing frame buffer snapshot ==="
+        vncsnapshot -allowblank localhost:1 test-proof.jpg || true
+
+    - name: Attach Proof Screenshot back to the Active Release Entry
+      uses: softprops/action-gh-release@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.fetch_iso.outputs.target_tag }}
+        files: test-proof.jpg

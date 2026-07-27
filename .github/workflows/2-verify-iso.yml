@@ -24,16 +24,20 @@ jobs:
     - name: Automatically Find and Fetch Latest ISO Asset Link
       id: fetch_iso
       run: |
-        # Queries the GitHub API to dynamically capture the download URL of your latest uploaded ISO
-        ISO_URL=$(curl -s "https://github.com{{ github.repository }}/releases/latest" \
-
-          | jq -r '.assets[] | select(.name=="kubuntu-26.04-minimal-hardened.iso") | .browser_download_url')
+        echo "=== Querying repository deployment endpoints ==="
+        # Uses a flat, structured template to extract the download location securely
+        ISO_URL=$(curl -s "https://github.com{{ github.repository }}/releases" | jq -r '.[0].assets[] | select(.name=="kubuntu-26.04-minimal-hardened.iso") | .browser_download_url')
+        TAG_NAME=$(curl -s "https://github.com{{ github.repository }}/releases" | jq -r '.[0].tag_name')
         
-        TAG_NAME=$(curl -s "https://github.com{{ github.repository }}/releases/latest" | jq -r '.tag_name')
+        if [ -z "$ISO_URL" ] || [ "$ISO_URL" = "null" ]; then
+            echo "ERROR: Failed to retrieve a valid download URL from the release index table."
+            exit 1
+        fi
         
         echo "Downloading target asset from: $ISO_URL"
         curl -L -o minimal.iso "$ISO_URL"
         echo "target_tag=$TAG_NAME" >> $GITHUB_OUTPUT
+
 
     - name: Headless Boot Execution Test Loop
       run: |

@@ -54,7 +54,7 @@ jobs:
           -daemonize
         
         echo "=== System is accelerating via KVM; waiting 25 seconds for full boot flow ==="
-        sleep 25
+        sleep 60
         
         echo "=== Capturing frame buffer snapshot ==="
         vncsnapshot -allowblank localhost:1 test-proof.jpg || true

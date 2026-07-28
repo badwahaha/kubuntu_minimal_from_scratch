@@ -59,7 +59,7 @@ jobs:
         echo "=== Capturing frame buffer snapshots: immediate t=0 and every 5s for 60s ==="
         SNAP_DIR="${GITHUB_WORKSPACE:-.}/snapshots"
         mkdir -p "$SNAP_DIR"
-        DURATION=60
+        DURATION=120
         INTERVAL=5
         END_TIME=$(( $(date +%s) + DURATION ))
         COUNTER=0

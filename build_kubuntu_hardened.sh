@@ -111,6 +111,9 @@ apt-get install -y -qq --no-install-recommends \
 apt-get install -y -qq --no-install-recommends \
     kde-plasma-desktop plasma-workspace konsole dolphin kate \
     kio-extras systemsettings xinit xserver-xorg-core xserver-xorg-video-all
+# E. Helper files
+apt-get install -y -qq --no-install-recommends \
+    update-notifier-common ubuntu-release-upgrader-core apport 
 
 # Configure Default Session & Desktop User Controls
 echo "kubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubuntu
@@ -121,10 +124,13 @@ mkdir -p /var/crash
 chown root:root /var/crash
 chmod 0755 /var/crash
 
-# Set hostname and /etc/hosts to avoid "sudo: unable to resolve host (none)"
-echo "kubuntu-live" > /etc/hostname
-cat >> /etc/hosts <<HOSTS
-127.0.0.1 kubuntu-live localhost
+# Ensure chroot has hostname + hosts before packages run
+cat > "${ROOTFS}/etc/hostname" <<HOSTNAME
+kubuntu-live
+HOSTNAME
+
+cat > "${ROOTFS}/etc/hosts" <<HOSTS
+127.0.0.1 localhost kubuntu-live
 127.0.1.1 kubuntu-live
 ::1 localhost ip6-localhost ip6-loopback
 HOSTS
@@ -204,6 +210,23 @@ sudo mksquashfs "${ROOTFS}" "${IMAGE_DIR}/casper/filesystem.squashfs" -comp xz -
 
 printf "%s" "$(du -sx --block-size=1 "${ROOTFS}" | cut -f1)" | sudo tee "${IMAGE_DIR}/casper/filesystem.size" > /dev/null
 
+# Create filesystem.manifest
+sudo chroot "${ROOTFS}" dpkg-query -W --showformat='${Package} ${Version}\n' \
+    > "${IMAGE_DIR}/casper/filesystem.manifest"
+
+# Create desktop manifest copy and prune installer/live-only packages (optional)
+cp "${IMAGE_DIR}/casper/filesystem.manifest" "${IMAGE_DIR}/casper/filesystem.manifest-desktop"
+# remove packages that shouldn't be in desktop manifest (adjust patterns as needed)
+sed -i -E '/(casper|ubiquity|live|calamares|cloud-init)/Id' "${IMAGE_DIR}/casper/filesystem.manifest-desktop" || true
+
+# Generate md5sum list for casper-md5check (exclude md5sum.txt itself)
+cd "${IMAGE_DIR}"
+find . -type f -print0 \
+  | xargs -0 md5sum \
+  | sed 's|^\./||' \
+  | grep -v -E '(^md5sum.txt$|/boot/grub/i386-pc/eltorito.img$)' \
+  > md5sum.txt
+  
 # 8. Dual-Boot Layout Configuration Matrix
 echo "=== [Step 7/8] Deploying Unified Hybrid Bootloader Rules ==="
 cat << 'EOF' > "${IMAGE_DIR}/boot/grub/grub.cfg"

@@ -115,6 +115,53 @@ apt-get install -y -qq --no-install-recommends \
 echo "kubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubuntu
 chmod 0440 /etc/sudoers.d/kubuntu
 
+# --- add inside the chroot here-doc, before cleanup / apt-get clean ---
+# Ensure /var/crash exists so init scripts don't fail
+mkdir -p /var/crash
+chown root:root /var/crash
+chmod 0755 /var/crash
+
+# Set hostname and /etc/hosts to avoid "sudo: unable to resolve host (none)"
+echo "kubuntu-live" > /etc/hostname
+cat >> /etc/hosts <<HOSTS
+127.0.0.1 kubuntu-live localhost
+127.0.1.1 kubuntu-live
+::1 localhost ip6-localhost ip6-loopback
+HOSTS
+
+# Install live and keyboard/console packages noninteractively so postinst scripts succeed
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y -qq --no-install-recommends \
+  live-boot live-config casper \
+  console-setup keyboard-configuration console-data \
+  sddm
+
+# Create the live user and give it passwordless sudo (and a sane home)
+groupadd -f netdev || true
+useradd -m -s /bin/bash -G sudo,netdev,audio,video kubuntu || true
+passwd -d kubuntu || true
+echo "kubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/kubuntu
+chmod 0440 /etc/sudoers.d/kubuntu
+mkdir -p /home/kubuntu/.cache /home/kubuntu/.config
+chown -R kubuntu:kubuntu /home/kubuntu
+
+# Configure SDDM autologin for KDE Plasma (adjust Session if needed)
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/0-autologin.conf <<SDF
+[Autologin]
+User=kubuntu
+Session=plasma.desktop
+SDF
+
+# make sure console setup is noninteractive (optional preseeding)
+debconf-set-selections <<DEB
+keyboard-configuration  keyboard-configuration/layout  select  English (US)
+keyboard-configuration  keyboard-configuration/modelcode  string  pc105
+DEB
+
+# --- end of additions ---
+
 # E. Space-Saving Optimizations
 find /usr/share/doc -depth -type f ! -name copyright -delete || true
 find /usr/share/man -type f -delete || true

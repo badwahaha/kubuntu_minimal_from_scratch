@@ -125,11 +125,11 @@ chown root:root /var/crash
 chmod 0755 /var/crash
 
 # Ensure chroot has hostname + hosts before packages run
-cat > "${ROOTFS}/etc/hostname" <<HOSTNAME
+cat > /etc/hostname <<HOSTNAME
 kubuntu-live
 HOSTNAME
 
-cat > "${ROOTFS}/etc/hosts" <<HOSTS
+cat > /etc/hosts <<HOSTS
 127.0.0.1 localhost kubuntu-live
 127.0.1.1 kubuntu-live
 ::1 localhost ip6-localhost ip6-loopback

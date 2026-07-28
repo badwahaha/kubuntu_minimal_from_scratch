@@ -241,21 +241,21 @@ insmod gfxterm
 menuentry "Kubuntu 26.04 Resolute (Boot)" {
     echo 'Loading Kubuntu Live Environment...'
     set gfxpayload=keep
-    linux /casper/vmlinuz boot=casper vt_handoff=7
+    linux /casper/vmlinuz boot=casper splash quiet vt_handoff=7
     initrd /casper/initrd.lz
 }
 
 menuentry "Kubuntu 26.04 Resolute (Safe Mode)" {
     echo 'Loading Kubuntu in Safe Mode...'
     set gfxpayload=keep
-    linux /casper/vmlinuz boot=casper nomodeset vt_handoff=7
+    linux /casper/vmlinuz boot=casper splash quiet nomodeset vt_handoff=7
     initrd /casper/initrd.lz
 }
 
 menuentry "Kubuntu 26.04 Resolute (OEM Mode)" {
     echo 'Loading Kubuntu in OEM Mode...'
     set gfxpayload=keep
-    linux /casper/vmlinuz boot=casper oem-config vt_handoff=7
+    linux /casper/vmlinuz boot=casper splash quiet oem-config vt_handoff=7
     initrd /casper/initrd.lz
 }
 EOF

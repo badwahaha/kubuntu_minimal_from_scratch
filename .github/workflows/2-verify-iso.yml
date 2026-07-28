@@ -35,7 +35,7 @@ jobs:
       run: |
         echo "=== Downloading compiled asset via native GitHub release paths ==="
         # FIXED: Bypasses API JSON lookups to download directly from the latest tag shortcut
-        curl -L -o minimal.iso "https://github.com{{ github.repository }}/releases/latest/download/kubuntu-26.04-minimal-hardened.iso"
+        curl -L -o minimal.iso "https://github.com/${{ github.repository }}/releases/latest/download/kubuntu-26.04-minimal-hardened.iso"
         
         # Dynamically capture tag name for fallback artifact updating
         TAG_NAME=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.tag_name')

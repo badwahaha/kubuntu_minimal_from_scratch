@@ -2,6 +2,7 @@
 # ==============================================================================
 # HARDENED KUBUNTU 26.04 LTS (RESOLUTE) MINIMAL ISO ENGINE FROM SCRATCH
 # Fully Corrected Dynamic String Expansion for Cloud Build Actions Platforms
+# Hybrid BIOS + UEFI Boot Support
 # ==============================================================================
 
 set -Eeuo pipefail
@@ -159,11 +160,138 @@ keyboard-configuration  keyboard-configuration/layout  select  English (US)
 keyboard-configuration  keyboard-configuration/modelcode  string  pc105
 DEB
 
-# ---------------------------------------------------------------------
 # Compatibility: ensure canonical "ubuntu" live user + helper stubs exist
 # Many upstream live scripts and package postinst hooks expect a user
 # named "ubuntu" and a handful of helper scripts. Create them here.
-# ---------------------------------------------------------------------
 groupadd -f netdev || true
 useradd -m -s /bin/bash -G sudo,netdev,audio,video ubuntu || true
 passwd -d ubuntu || true
+
+# Generate initramfs for all installed kernels
+echo "Generating initramfs..."
+update-initramfs -c -k all
+
+# E. Space-Saving Optimizations
+find /usr/share/doc -depth -type f ! -name copyright -delete || true
+find /usr/share/man -type f -delete || true
+rm -rf /usr/share/groff/* /usr/share/info/* /var/cache/man/*
+
+apt-get autoremove --purge -y -qq
+apt-get clean
+rm -rf /tmp/* /var/lib/apt/lists/*
+EOF
+
+# 6. Extract Kernel Assets For Media Boot Loader
+echo "=== [Step 5/8] Pulling Boot Kernel and Initial Boot Ramdisk Images ==="
+KERNEL_VERSION=$(ls "${ROOTFS}/boot"/vmlinuz-* 2>/dev/null | head -n 1 | sed 's/.*vmlinuz-//')
+
+if [ -z "${KERNEL_VERSION}" ]; then
+    echo "ERROR: No kernel found in ${ROOTFS}/boot"
+    exit 1
+fi
+
+sudo cp "${ROOTFS}/boot/vmlinuz-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/vmlinuz"
+sudo cp "${ROOTFS}/boot/initrd.img-${KERNEL_VERSION}" "${IMAGE_DIR}/casper/initrd.lz"
+
+# 7. Compress Live Workspace File Container
+echo "=== [Step 6/8] Recompressing Sandbox System into Squashfs Container ==="
+sudo umount "${ROOTFS}/dev/pts" || true
+sudo umount "${ROOTFS}/dev"     || true
+sudo umount "${ROOTFS}/proc"    || true
+sudo umount "${ROOTFS}/sys"     || true
+
+sudo mksquashfs "${ROOTFS}" "${IMAGE_DIR}/casper/filesystem.squashfs" -comp xz -b 1M -noappend
+
+printf "%s" "$(du -sx --block-size=1 "${ROOTFS}" | cut -f1)" | sudo tee "${IMAGE_DIR}/casper/filesystem.size" > /dev/null
+
+# 8. Dual-Boot Layout Configuration Matrix
+echo "=== [Step 7/8] Deploying Unified Hybrid Bootloader Rules ==="
+cat << 'EOF' > "${IMAGE_DIR}/boot/grub/grub.cfg"
+set default="0"
+set timeout=5
+
+insmod efi_gop
+insmod efi_uga
+insmod video_bochs
+insmod video_cirrus
+insmod gfxterm
+
+menuentry "Kubuntu 26.04 Resolute (Boot)" {
+    echo 'Loading Kubuntu Live Environment...'
+    set gfxpayload=keep
+    linux /casper/vmlinuz boot=casper quiet splash vt_handoff=7
+    initrd /casper/initrd.lz
+}
+
+menuentry "Kubuntu 26.04 Resolute (Safe Mode)" {
+    echo 'Loading Kubuntu in Safe Mode...'
+    set gfxpayload=keep
+    linux /casper/vmlinuz boot=casper quiet splash nomodeset vt_handoff=7
+    initrd /casper/initrd.lz
+}
+
+menuentry "Kubuntu 26.04 Resolute (OEM Mode)" {
+    echo 'Loading Kubuntu in OEM Mode...'
+    set gfxpayload=keep
+    linux /casper/vmlinuz boot=casper oem-config quiet splash vt_handoff=7
+    initrd /casper/initrd.lz
+}
+EOF
+
+# 9. Master Production ISO Output Image via xorriso
+echo "=== [Step 8/8] Mastering Bootable Hybrid Image via Xorriso ==="
+
+# Pre-generate the target directory structure
+mkdir -p "${IMAGE_DIR}/boot/grub/i386-pc"
+
+# Mirror the host system's GRUB runtime modules into the ISO layout directory
+echo "Syncing GRUB i386-pc modular runtime objects..."
+cp /usr/lib/grub/i386-pc/*.mod "${IMAGE_DIR}/boot/grub/i386-pc/"
+cp /usr/lib/grub/i386-pc/*.lst "${IMAGE_DIR}/boot/grub/i386-pc/"
+
+# Compile the base core bootloader layer image for BIOS
+sudo grub-mkimage -o "${IMAGE_DIR}/boot/grub/i386-pc/core.img" -O i386-pc -p /boot/grub biosdisk ext2 fat iso9660 search
+cat /usr/lib/grub/i386-pc/cdboot.img "${IMAGE_DIR}/boot/grub/i386-pc/core.img" > "${IMAGE_DIR}/boot/grub/i386-pc/eltorito.img"
+
+# Build standalone GRUB images for hybrid boot
+echo "Creating GRUB standalone images for hybrid boot..."
+sudo grub-mkstandalone -O i386-pc \
+    --output="${IMAGE_DIR}/boot/grub/i386-pc/grub-standalone.img" \
+    --install-modules="biosdisk part_msdos part_gpt normal linux iso9660 search" \
+    "boot/grub/grub.cfg=${IMAGE_DIR}/boot/grub/grub.cfg" 2>/dev/null || true
+
+sudo grub-mkstandalone -O x86_64-efi \
+    --output="${IMAGE_DIR}/boot/grub/efi.img" \
+    --install-modules="efi_gop efi_uga normal linux iso9660 search" \
+    "boot/grub/grub.cfg=${IMAGE_DIR}/boot/grub/grub.cfg" 2>/dev/null || true
+
+# Create hybrid ISO with both BIOS and UEFI support
+cd "${IMAGE_DIR}"
+sudo xorriso -as mkisofs \
+    -iso-level 3 \
+    -o "${ISO_OUT}" \
+    -full-iso9660-filenames \
+    -volid "KUBUNTU_RESOLVE" \
+    -appid "Kubuntu 26.04 Resolute Hardened" \
+    -partition_offset 16 \
+    -A "Kubuntu Resolute 26.04 LTS" \
+    -b boot/grub/i386-pc/eltorito.img \
+        -c boot.catalog \
+        -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
+    --efi-boot boot/grub/efi.img \
+        -efi-boot-part --efi-boot-image \
+    .
+
+echo "=============================================================================="
+echo " ✅ SUCCESS! Your custom hardened minimal Kubuntu ISO is available at:"
+echo " 📦 ${ISO_OUT}"
+echo "=============================================================================="
+if [ -f "${ISO_OUT}" ]; then
+    ISO_SIZE=$(du -h "${ISO_OUT}" | cut -f1)
+    echo " 📏 Size: ${ISO_SIZE}"
+    echo " 🚀 Ready to boot from USB or VM!"
+    ls -lh "${ISO_OUT}"
+else
+    echo " ❌ ISO creation failed!"
+    exit 1
+fi

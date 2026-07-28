@@ -54,15 +54,30 @@ jobs:
           -daemonize
         
         echo "=== System is accelerating via KVM; waiting 25 seconds for full boot flow ==="
-        sleep 60
+        sleep 25
         
-        echo "=== Capturing frame buffer snapshot ==="
-        vncsnapshot -allowblank localhost:1 test-proof.jpg || true
+        echo "=== Capturing frame buffer snapshots: immediate t=0 and every 5s for 60s ==="
+        SNAP_DIR="${GITHUB_WORKSPACE:-.}/snapshots"
+        mkdir -p "$SNAP_DIR"
+        DURATION=60
+        INTERVAL=5
+        END_TIME=$(( $(date +%s) + DURATION ))
+        COUNTER=0
+        while [ "$(date +%s)" -le "$END_TIME" ]; do
+          TS=$(date +%Y%m%d-%H%M%S)
+          FNAME="test-proof-${COUNTER}-${TS}.jpg"
+          echo "Taking snapshot: $FNAME"
+          vncsnapshot -allowblank localhost:1 "$SNAP_DIR/$FNAME" || true
+          COUNTER=$((COUNTER+1))
+          sleep $INTERVAL
+        done
 
-    - name: Attach Proof Screenshot back to the Active Release Entry
+        echo "Snapshots saved to $SNAP_DIR (total: $COUNTER)"
+
+    - name: Attach Proof Screenshot(s) back to the Active Release Entry
       uses: softprops/action-gh-release@v2
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: ${{ steps.fetch_iso.outputs.target_tag }}
-        files: test-proof.jpg
+        files: snapshots/*.jpg

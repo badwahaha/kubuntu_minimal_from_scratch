@@ -81,22 +81,25 @@ Types: deb
 URIs: $MIRROR
 Suites: $CODENAME
 Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
 URIs: $MIRROR
 Suites: $CODENAME-updates
 Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
 URIs: $MIRROR
 Suites: $CODENAME-security
 Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
 URIs: $MIRROR
 Suites: $CODENAME-backports
 Components: main restricted universe multiverse
-# Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 SOURCES
 
 # Make sure we have minimal apt metadata, install the archive keyring, then refresh

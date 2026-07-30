@@ -287,10 +287,35 @@ sudo grub-mkstandalone -O i386-pc \
     --install-modules="biosdisk part_msdos part_gpt normal linux iso9660 search" \
     "boot/grub/grub.cfg=${IMAGE_DIR}/boot/grub/grub.cfg" 2>/dev/null || true
 
+# --- ensure dosfstools is installed (add to apt install earlier) ---
+# sudo apt-get install -y -qq dosfstools mtools
+
+# --- copy x86_64-efi GRUB modules into ISO layout ---
+mkdir -p "${IMAGE_DIR}/boot/grub/x86_64-efi"
+cp /usr/lib/grub/x86_64-efi/*.mod "${IMAGE_DIR}/boot/grub/x86_64-efi/" 2>/dev/null || true
+
+# --- produce a standalone EFI binary (grub EFI executable) and create a FAT efi.img ---
+# create an EFI binary (this embeds the config that we already wrote to ${IMAGE_DIR}/boot/grub/grub.cfg)
 sudo grub-mkstandalone -O x86_64-efi \
-    --output="${IMAGE_DIR}/boot/grub/efi.img" \
-    --install-modules="efi_gop efi_uga normal linux iso9660 search" \
-    "boot/grub/grub.cfg=${IMAGE_DIR}/boot/grub/grub.cfg" 2>/dev/null || true
+  --output="/tmp/BOOTX64.EFI" \
+  --install-modules="efi_gop efi_uga normal linux iso9660 search" \
+  "boot/grub/grub.cfg=${IMAGE_DIR}/boot/grub/grub.cfg" 2>/dev/null || true
+
+# make a small FAT image to use as the EFI system partition
+sudo dd if=/dev/zero of="${IMAGE_DIR}/efi.img" bs=1M count=64 status=none || true
+sudo mkfs.vfat -n EFI "${IMAGE_DIR}/efi.img"
+
+# mount, populate, then unmount
+TMPDIR=$(mktemp -d)
+sudo mount -o loop "${IMAGE_DIR}/efi.img" "${TMPDIR}"
+sudo mkdir -p "${TMPDIR}/EFI/BOOT" "${TMPDIR}/boot/grub"
+sudo cp /tmp/BOOTX64.EFI "${TMPDIR}/EFI/BOOT/BOOTX64.EFI"
+# copy the grub folder (modules + config) so grub can find modules if needed
+sudo cp -r "${IMAGE_DIR}/boot/grub" "${TMPDIR}/boot/"
+sync
+sudo umount "${TMPDIR}"
+rmdir "${TMPDIR}"
+rm -f /tmp/BOOTX64.EFI
 
 # Create hybrid ISO with both BIOS and UEFI support
 cd "${IMAGE_DIR}"

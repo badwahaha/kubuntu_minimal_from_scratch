@@ -104,7 +104,7 @@ SOURCES
 
 # Make sure we have minimal apt metadata, install the archive keyring, then refresh
 apt-get update -qq || true
-apt-get install -y -qq --no-install-recommends ubuntu-archive-keyring ca-certificates
+apt-get install -y -qq --no-install-recommends ubuntu-keyring ca-certificates
 apt-get update -qq
 apt-get upgrade -y -qq
 

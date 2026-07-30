@@ -75,33 +75,33 @@ fi
 
 mkdir -p /etc/apt/sources.list.d
 
-# SOURCES is unquoted to allow variable expansion inside the chroot context
+# Create DEB822 .sources with variable expansion in the chroot context
 cat << SOURCES > /etc/apt/sources.list.d/ubuntu.sources
 Types: deb
-URIs: \$MIRROR
-Suites: \$CODENAME
+URIs: $MIRROR
+Suites: $CODENAME
 Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
-URIs: \$MIRROR
-Suites: \$CODENAME-updates
+URIs: $MIRROR
+Suites: $CODENAME-updates
 Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
-URIs: \$MIRROR
-Suites: \$CODENAME-security
+URIs: $MIRROR
+Suites: $CODENAME-security
 Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 
 Types: deb
-URIs: \$MIRROR
-Suites: \$CODENAME-backports
+URIs: $MIRROR
+Suites: $CODENAME-backports
 Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+# Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 SOURCES
 
+# Make sure we have minimal apt metadata, install the archive keyring, then refresh
+apt-get update -qq || true
+apt-get install -y -qq --no-install-recommends ubuntu-archive-keyring ca-certificates
 apt-get update -qq
 apt-get upgrade -y -qq
 
@@ -140,7 +140,7 @@ apt-get update -qq
 apt-get install -y -qq --no-install-recommends \
   live-boot live-config casper \
   console-setup keyboard-configuration console-data \
-  sddm
+  sddm rsync wget ca-certificates
 
 # Create the kubuntu live user and give it passwordless sudo (and a sane home)
 groupadd -f netdev || true

@@ -42,15 +42,17 @@ echo "=== [Step 2/8] Instantiating Clean Resolute Raccoon Operating System Tree 
 sudo debootstrap --variant=minbase --components=main,universe,restricted,multiverse \
     "${CODENAME}" "${ROOTFS}" "${MIRROR}" /usr/share/debootstrap/scripts/noble
 
-# Ensure the live root has a sane hostname and hosts file early to avoid sudo "unable to resolve host" warnings
-echo "Setting up /etc/hostname and /etc/hosts inside target root to avoid host resolution errors..."
+# 2. NOW apply your hosts fix (overwriting the host runner's leaked network templates)
+echo "Setting up /etc/hostname and /etc/hosts inside target root..."
 sudo mkdir -p "${ROOTFS}/etc"
 echo "kubuntu-live" | sudo tee "${ROOTFS}/etc/hostname" > /dev/null
-sudo bash -c "cat > ${ROOTFS}/etc/hosts <<EOF
-127.0.0.1 localhost kubuntu-live
-127.0.1.1 kubuntu-live
-::1 localhost ip6-localhost ip6-loopback
-EOF"
+
+# Fix the bash syntax loopback template string
+sudo bash -c "cat > ${ROOTFS}/etc/hosts" << 'EOF'
+127.0.0.1   localhost
+127.0.1.1   kubuntu-live
+::1         localhost ip6-localhost ip6-loopback
+EOF
 
 # 4. Virtual Mount Binding Execution
 echo "=== [Step 3/8] Bridging Virtual Host Kernel Filesystem Tables ==="
@@ -244,21 +246,21 @@ insmod gfxterm
 menuentry "Kubuntu 26.04 Resolute (Boot)" {
     echo 'Loading Kubuntu Live Environment...'
     set gfxpayload=keep
-    linux /casper/vmlinuz boot=casper splash quiet vt_handoff=7
+    linux /casper/vmlinuz boot=casper hostname=kubuntu-live splash quiet vt_handoff=7
     initrd /casper/initrd.lz
 }
 
 menuentry "Kubuntu 26.04 Resolute (Safe Mode)" {
     echo 'Loading Kubuntu in Safe Mode...'
     set gfxpayload=keep
-    linux /casper/vmlinuz boot=casper splash quiet nomodeset vt_handoff=7
+    linux /casper/vmlinuz boot=casper hostname=kubuntu-live splash quiet nomodeset vt_handoff=7
     initrd /casper/initrd.lz
 }
 
 menuentry "Kubuntu 26.04 Resolute (OEM Mode)" {
     echo 'Loading Kubuntu in OEM Mode...'
     set gfxpayload=keep
-    linux /casper/vmlinuz boot=casper splash quiet oem-config vt_handoff=7
+    linux /casper/vmlinuz boot=casper hostname=kubuntu-live splash quiet oem-config vt_handoff=7
     initrd /casper/initrd.lz
 }
 EOF

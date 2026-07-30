@@ -23,7 +23,7 @@ jobs:
     - name: Install System Compilation Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync zstd
+        sudo apt-get install -y debootstrap squashfs-tools xorriso grub-pc-bin grub-efi-amd64-bin binutils gdisk rsync zstd ubuntu-keyring ca-certificates gnupg
 
     - name: Set Script Permissions
       run: chmod +x build_kubuntu_hardened.sh
